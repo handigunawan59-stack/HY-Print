@@ -20,24 +20,30 @@ export function isBlankPage(rgba) {
   }
   return true;
 }
+// A low-resolution white preview is insufficient evidence on its own.
+export function isBlankFromEvidence(lowResolution, textItems, highResolution) {
+  if (!isBlankPage(lowResolution) || !Array.isArray(textItems)) return false;
+  if (textItems.some(item => typeof item.str === 'string' && item.str.trim())) return false;
+  return !!highResolution && isBlankPage(highResolution);
+}
 export function calculate(pages, bwPrice, colorPrice) {
   let bw=0,color=0;
-  for(const p of pages) if(p.selected) { if(p.color) color+=p.copies; else bw+=p.copies; }
+  for(const p of pages) if(p.selected && !p.blank) { if(p.color) color+=p.copies; else bw+=p.copies; }
   return {bw,color,total:bw*bwPrice+color*colorPrice};
 }
 export function printPlan(pages, reverse = false) {
   const ordered = reverse ? [...pages].reverse() : pages;
-  return ordered.flatMap(p=>p.selected ? Array.from({length:p.copies},()=>({number:p.number,color:p.color})) : []);
+  return ordered.flatMap(p=>p.selected && !p.blank ? Array.from({length:p.copies},()=>({number:p.number,color:p.color})) : []);
 }
 // A reversing driver cancels an already reversed document; compensate once.
 export function reverseForDriver(desiredReverse, driverReverses) {
   return Boolean(desiredReverse) !== Boolean(driverReverses);
 }
 export function printPreferences(storage) {
-  const defaults={reverse:true,driverReverse:true,skipBlank:false};
+  const defaults={reverse:true,driverReverse:true};
   try {
     const saved=JSON.parse(storage.getItem('hyprint.printPreferences') || 'null');
-    if (saved && ['reverse','driverReverse','skipBlank'].every(key=>typeof saved[key]==='boolean')) return saved;
+    if (saved && ['reverse','driverReverse'].every(key=>typeof saved[key]==='boolean')) return {reverse:saved.reverse,driverReverse:saved.driverReverse};
   } catch {}
   return defaults;
 }
@@ -54,6 +60,13 @@ export function pageOverflow(renderedHeight, pageHeight) {
 export function filterPages(pages, mode = 'all', selectedOnly = false, skipBlank = false) {
   if (!['all', 'color', 'bw', 'blank'].includes(mode)) throw new RangeError('Invalid page filter');
   return pages.filter(page => (!selectedOnly || page.selected) && (!skipBlank || !page.blank)
-    && (mode === 'all' || (mode === 'blank' ? page.blank : page.color === (mode === 'color'))));
+    && (mode === 'all' || (mode === 'blank' ? page.blank : !page.blank && page.color === (mode === 'color'))));
+}
+export function documentSummary(pages, mode='all') {
+  const printing=filterPages(pages,mode,true,true);
+  const counts=calculate(printing,0,0);
+  const blank=pages.filter(page=>page.blank).length;
+  return {total:pages.length,blank,content:pages.length-blank,printing:printing.length,
+          sheets:counts.bw+counts.color,bw:counts.bw,color:counts.color};
 }
 

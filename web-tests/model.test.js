@@ -90,7 +90,56 @@ test('print preferences default to reversed driver compensation and preserve use
   const { printPreferences, storePrintPreferences } = await import('../src/model.js');
   const values=new Map();
   const storage={getItem:key=>values.get(key) ?? null,setItem:(key,value)=>values.set(key,value)};
-  assert.deepEqual(printPreferences(storage), {reverse:true,driverReverse:true,skipBlank:false});
-  storePrintPreferences(storage, {reverse:false,driverReverse:false,skipBlank:true});
-  assert.deepEqual(printPreferences(storage), {reverse:false,driverReverse:false,skipBlank:true});
+  assert.deepEqual(printPreferences(storage), {reverse:true,driverReverse:true});
+  storePrintPreferences(storage, {reverse:false,driverReverse:false});
+  assert.deepEqual(printPreferences(storage), {reverse:false,driverReverse:false});
+});
+
+test('automatically leave detected blank pages out of printing and pricing', () => {
+  const pages = [
+    {number:1, selected:true, blank:true, color:false, copies:2},
+    {number:2, selected:true, blank:false, color:true, copies:1},
+    {number:3, selected:false, blank:false, color:false, copies:1},
+  ];
+  assert.deepEqual(printPlan(pages), [{number:2,color:true}]);
+  assert.deepEqual(calculate(pages,500,1500), {bw:0,color:1,total:1500});
+  pages[0].blank=false;
+  assert.deepEqual(printPlan(pages).map(p=>p.number), [1,1,2]);
+  assert.deepEqual(calculate(pages,500,1500), {bw:2,color:1,total:2500});
+});
+
+test('reports document and print counts including corrected blank pages', async () => {
+  const { documentSummary } = await import('../src/model.js');
+  const pages = [
+    {number:1, selected:true, blank:true, color:false, copies:1},
+    {number:2, selected:true, blank:false, color:true, copies:2},
+    {number:3, selected:false, blank:false, color:false, copies:1},
+  ];
+  assert.deepEqual(documentSummary(pages,'all'), {total:3,blank:1,content:2,printing:1,sheets:2,bw:0,color:2});
+  assert.deepEqual(documentSummary(pages,'bw'), {total:3,blank:1,content:2,printing:0,sheets:0,bw:0,color:0});
+  pages[0].blank=false;
+  assert.deepEqual(documentSummary(pages,'bw'), {total:3,blank:0,content:3,printing:1,sheets:1,bw:1,color:0});
+});
+
+test('legacy preference cannot disable skipping of blank pages', async () => {
+  const { printPreferences } = await import('../src/model.js');
+  const storage={getItem:()=>JSON.stringify({reverse:false,driverReverse:true,skipBlank:false})};
+  assert.deepEqual(printPreferences(storage), {reverse:false,driverReverse:true});
+});
+
+test('blank classification preserves tiny text or marks seen at higher resolution', async () => {
+  const { isBlankFromEvidence } = await import('../src/model.js');
+  const white = new Uint8ClampedArray([255,255,255,255]);
+  const mark = new Uint8ClampedArray([255,255,255,255, 254,254,254,255]);
+  assert.equal(isBlankFromEvidence(white, [{str:'catatan'}], white), false);
+  assert.equal(isBlankFromEvidence(white, [], mark), false);
+  assert.equal(isBlankFromEvidence(white, [], white), true);
+  assert.equal(isBlankFromEvidence(white, [], null), false);
+});
+
+test('color and black and white previews do not classify blank pages as colored sheets', async () => {
+  const { filterPages } = await import('../src/model.js');
+  const pages=[{number:1,blank:true,color:false},{number:2,blank:false,color:false},{number:3,blank:false,color:true}];
+  assert.deepEqual(filterPages(pages,'bw').map(p=>p.number),[2]);
+  assert.deepEqual(filterPages(pages,'blank').map(p=>p.number),[1]);
 });

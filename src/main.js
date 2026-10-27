@@ -1,17 +1,17 @@
 import './style.css';
 import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import {paperName, classifyColor, colorCoverage, isBlankPage, calculate, printPlan, reverseForDriver, printPreferences, storePrintPreferences, documentKind, filterPages} from './model.js';
+import {paperName, classifyColor, colorCoverage, isBlankPage, isBlankFromEvidence, calculate, documentSummary, printPlan, reverseForDriver, printPreferences, storePrintPreferences, documentKind, filterPages} from './model.js';
 import {validatePasswordChange} from './admin-password.js';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 const $ = id => document.getElementById(id);
-const ui = Object.fromEntries(['file','notice','file-info','filename','file-detail','page-count','pages','select-all','select-none','change-file','preview-label','threshold','bw-price','color-price','bw-rate','color-rate','threshold-info','settings-status','settings-retry','total','summary','print','admin-open','admin-close','admin-dialog','admin-message','login-form','admin-form','admin-password','admin-logout','preview-dialog','preview-title','preview-meta','preview-close','preview-canvas','password-details','password-form','current-password','new-password','confirm-password'].map(id=>[id,$(id)]));
+const ui = Object.fromEntries(['file','notice','file-info','filename','file-detail','page-count','pages','select-all','select-none','change-file','preview-label','doc-summary','threshold','bw-price','color-price','bw-rate','color-rate','threshold-info','settings-status','settings-retry','total','summary','print','admin-open','admin-close','admin-dialog','admin-message','login-form','admin-form','admin-password','admin-logout','preview-dialog','preview-title','preview-meta','preview-close','preview-canvas','password-details','password-form','current-password','new-password','confirm-password'].map(id=>[id,$(id)]));
 const state = {pdf:null,pages:[],name:'',token:0,busy:false,printing:false,loadingTask:null,settings:null,previewFilter:'all',printFilter:'all'};
-let preferences={reverse:true,driverReverse:true,skipBlank:false};
+let preferences={reverse:true,driverReverse:true};
 try {preferences=printPreferences(localStorage)} catch {}
-$('print-order').value=preferences.reverse?'reverse':'forward';$('driver-reverse').checked=preferences.driverReverse;$('skip-blank').checked=preferences.skipBlank;
-function savePrintOptions(){try {storePrintPreferences(localStorage,{reverse:$('print-order').value==='reverse',driverReverse:$('driver-reverse').checked,skipBlank:$('skip-blank').checked})} catch {}}
+$('print-order').value=preferences.reverse?'reverse':'forward';$('driver-reverse').checked=preferences.driverReverse;
+function savePrintOptions(){try {storePrintPreferences(localStorage,{reverse:$('print-order').value==='reverse',driverReverse:$('driver-reverse').checked})} catch {}}
 const rupiah = n => 'Rp '+new Intl.NumberFormat('id-ID').format(n);
 function showNotice(text) { ui.notice.textContent=text; ui.notice.hidden=!text; }
 function showAdmin(text) { ui['admin-message'].textContent=text; ui['admin-message'].hidden=!text; }
@@ -20,10 +20,12 @@ function clampInput(input,min,max,fallback) {
   input.value=value; return value;
 }
 function updateSummary() {
-  const pages=filterPages(state.pages,state.printFilter,true,$('skip-blank').checked);
+  const pages=filterPages(state.pages,state.printFilter,true,true);
   const values=calculate(pages,state.settings?.bwPrice??0,state.settings?.colorPrice??0);
+  const counts=documentSummary(state.pages,state.printFilter);
   ui.total.textContent=rupiah(values.total);
-  ui.summary.textContent=`${pages.length} halaman · ${values.bw+values.color} lembar · ${values.bw} hitam putih · ${values.color} warna`;
+  ui['doc-summary'].textContent=counts.total?`Total ${counts.total} halaman · ${counts.blank} kosong · ${counts.content} berisi`:'Belum ada dokumen';
+  ui.summary.textContent=counts.total?`${counts.printing} halaman dipilih · ${counts.sheets} halaman cetak · ${counts.bw} hitam putih · ${counts.color} warna`:'Belum ada halaman untuk dicetak';
   ui.print.disabled=state.busy || !state.pdf || !state.settings || values.bw+values.color===0;
 }
 function setBusy(value) {
@@ -42,22 +44,22 @@ function drawRows() {
   ui.pages.replaceChildren();
   const visible=filterPages(state.pages,state.previewFilter);
   ui['preview-label'].textContent=state.pages.length?`${visible.length} dari ${state.pages.length} halaman`:'Belum ada halaman';
-  if(!visible.length) {ui.pages.append(el('p',{class:'empty'},state.pages.length?'Tidak ada halaman dalam filter ini.':'Pratinjau semua halaman muncul di sini setelah dokumen dipilih.'));return;}
+  if(!visible.length) {ui.pages.append(el('p',{class:'empty'},state.pages.length?'Tidak ada halaman yang sesuai pilihan ini.':'Pilih dokumen untuk melihat halaman di sini.'));return;}
   visible.forEach(page=>{
     const tile=el('article',{class:'page-tile'}),imageArea=el('button',{type:'button',class:'tile-image','aria-label':`Perbesar pratinjau halaman ${page.number}`});
     imageArea.addEventListener('click',()=>showPreview(page));
     const image=el('img',{src:page.thumb,alt:`Pratinjau halaman ${page.number}`,class:page.color?'':'bw'});imageArea.append(image);
     const header=el('div',{class:'tile-head'}),label=el('label');
-    const check=el('input',{type:'checkbox','aria-label':`Cetak halaman ${page.number}`});check.checked=page.selected;
+    const check=el('input',{type:'checkbox','aria-label':`Cetak halaman ${page.number}`});check.checked=page.selected && !page.blank;check.disabled=page.blank;
     check.addEventListener('change',()=>{page.selected=check.checked;updateSummary()});label.append(check,document.createTextNode(`Hal. ${page.number}`));
     header.append(label,el('span',{},page.paper));
     const controls=el('div',{class:'tile-controls'});
-    const mode=el('select',{'aria-label':`Mode halaman ${page.number}`,title:`Perkiraan cakupan warna ${(page.coverage*100).toFixed(2)}%`});
+    const mode=el('select',{'aria-label':`Warna cetak halaman ${page.number}`,title:`Warna pada halaman sekitar ${(page.coverage*100).toFixed(2)}%`});
     mode.append(el('option',{value:'bw'},'Hitam putih'),el('option',{value:'color'},'Warna'));mode.value=page.color?'color':'bw';
     mode.addEventListener('change',()=>{page.color=mode.value==='color';drawRows();updateSummary()});
     const copies=el('input',{type:'number',min:1,max:99,step:1,'aria-label':`Salinan halaman ${page.number}`});copies.value=page.copies;
     copies.addEventListener('change',()=>{page.copies=Math.trunc(clampInput(copies,1,99,1));copies.value=page.copies;updateSummary()});
-    const blank=el('select',{'aria-label':`Status halaman kosong ${page.number}`,title:'Periksa deteksi dan ubah status jika perlu'});
+    const blank=el('select',{'aria-label':`Status halaman kosong ${page.number}`,title:'Periksa halaman ini dan ubah jika perlu'});
     blank.append(el('option',{value:'content'},'Ada isi'),el('option',{value:'blank'},'Kosong'));blank.value=page.blank?'blank':'content';
     blank.addEventListener('change',()=>{page.blank=blank.value==='blank';drawRows();updateSummary()});
     controls.append(mode,copies);tile.append(imageArea,header,controls,blank);ui.pages.append(tile);
@@ -79,7 +81,7 @@ async function showPreview(page) {
     if(token!==previewToken)return;
     ui['preview-canvas'].width=canvas.width;ui['preview-canvas'].height=canvas.height;ui['preview-canvas'].classList.toggle('bw',!page.color);
     ui['preview-canvas'].getContext('2d').drawImage(canvas,0,0);
-  } catch(error){if(token===previewToken){ui['preview-dialog'].close();showNotice('Pratinjau tidak dapat dibuat: '+error.message)}}
+  } catch(error){if(token===previewToken){ui['preview-dialog'].close();showNotice('Halaman tidak bisa ditampilkan: '+error.message)}}
 }
 ui['preview-close'].addEventListener('click',()=>ui['preview-dialog'].close());
 ui['preview-dialog'].addEventListener('close',()=>previewToken++);
@@ -135,7 +137,7 @@ ui['admin-form'].addEventListener('submit',async event=>{
     const threshold=Number(ui.threshold.value),bwPrice=Number(ui['bw-price'].value),colorPrice=Number(ui['color-price'].value);
     const result=await api('/api/admin/settings',{method:'PUT',body:JSON.stringify({threshold,bwPrice,colorPrice})});
     applySettings(result.settings,{reclassify:true});
-    showAdmin('Pengaturan tersimpan. Deteksi warna diterapkan ulang. Perangkat lain mungkin memerlukan waktu untuk menerima perubahan.');
+    showAdmin('Pengaturan disimpan. Warna halaman diperiksa kembali. Perubahan mungkin belum langsung muncul di perangkat lain.');
   } catch(error){showAdmin(error.message);if(error.status===401)setAdminAuthenticated(false);} finally{button.disabled=false;}
 });
 ui['password-form'].addEventListener('submit',async event=>{
@@ -159,27 +161,27 @@ ui['admin-logout'].addEventListener('click',async()=>{try{await api('/api/admin/
 ui['settings-retry'].addEventListener('click',()=>loadSettings({reclassify:true}));
 async function inspectFile(file) {
   if(!file) return;
-  if(state.printing) {showNotice('Tunggu hingga penyiapan cetak selesai sebelum mengganti dokumen.');return;}
+  if(state.printing) {showNotice('Tunggu sampai dokumen siap dicetak sebelum memilih dokumen lain.');return;}
   const token=++state.token;
   if(state.loadingTask) {state.loadingTask.destroy();state.loadingTask=null;}
   state.pdf=null;state.pages=[];state.name='';
-  ui['file-info'].hidden=true;ui['page-count'].textContent='Belum ada file';
+  ui['file-info'].hidden=true;ui['page-count'].textContent='Belum ada dokumen';
   drawRows();setBusy(false);
   const kind=documentKind(file.name);
   if(!kind) { showNotice('Pilih PDF atau Word .docx. Format Word lama .doc harus disimpan ulang sebagai .docx atau PDF di Word.');return; }
-  if(!state.settings){showNotice('Muat pengaturan admin terlebih dahulu sebelum memeriksa dokumen.');return;}
-  setBusy(true); showNotice('Membuka dokumen dan memeriksa warna halaman…');
+  if(!state.settings){showNotice('Pengaturan harga belum tersedia. Periksa koneksi lalu coba lagi.');return;}
+  setBusy(true); showNotice('Membuka dokumen dan memeriksa setiap halaman…');
   let loadingTask;
   try {
     let bytes=await file.arrayBuffer();
     if(kind==='docx') {
-      showNotice('Mengonversi Word ke PDF di browser…');
+      showNotice('Mengubah Word menjadi PDF…');
       const {convertDocx}=await import('./docx.js');
-      bytes=await convertDocx(bytes,(n,total)=>{if(token===state.token) showNotice(`Mengonversi halaman Word ${n} dari ${total}…`)});
+      bytes=await convertDocx(bytes,(n,total)=>{if(token===state.token) showNotice(`Mengubah halaman Word ${n} dari ${total}…`)});
     }
     loadingTask=pdfjs.getDocument({data:bytes});const pdf=await loadingTask.promise;
     if(token!==state.token){loadingTask.destroy();return;}
-    if(pdf.numPages>300) { loadingTask.destroy();throw new Error('Dokumen melebihi 300 halaman. Bagi PDF menjadi beberapa file agar pemeriksaan tetap lancar.'); }
+    if(pdf.numPages>300) { loadingTask.destroy();throw new Error('Dokumen melebihi 300 halaman. Bagi PDF menjadi beberapa dokumen agar pemeriksaan tetap lancar.'); }
     const pages=[];
     for(let n=1;n<=pdf.numPages;n++) {
       const page=await pdf.getPage(n), viewport=page.getViewport({scale:1});
@@ -187,7 +189,24 @@ async function inspectFile(file) {
       const context=canvas.getContext('2d',{willReadFrequently:true});
       await page.render({canvasContext:context,viewport,background:'#fff'}).promise;
       const pixelData=context.getImageData(0,0,canvas.width,canvas.height).data;
-      const coverage=colorCoverage(pixelData),blank=isBlankPage(pixelData);
+      const coverage=colorCoverage(pixelData);
+      let blank=false;
+      if (isBlankPage(pixelData)) {
+        try {
+          const text=await page.getTextContent();
+          if (Array.isArray(text.items) && !text.items.some(item=>typeof item.str==='string' && item.str.trim())) {
+            const highViewport=page.getViewport({scale:2});
+            if (highViewport.width * highViewport.height <= 32000000) {
+              const high=document.createElement('canvas');
+              high.width=Math.ceil(highViewport.width);high.height=Math.ceil(highViewport.height);
+              const highContext=high.getContext('2d',{willReadFrequently:true});
+              await page.render({canvasContext:highContext,viewport:highViewport,background:'#fff'}).promise;
+              blank=isBlankFromEvidence(pixelData,text.items,highContext.getImageData(0,0,high.width,high.height).data);
+              high.width=high.height=0;
+            }
+          }
+        } catch { blank=false; }
+      }
       const width=viewport.width*25.4/72,height=viewport.height*25.4/72;
       const scale=Math.min(180/canvas.width,210/canvas.height,1),thumb=document.createElement('canvas');
       thumb.width=Math.max(1,Math.round(canvas.width*scale));thumb.height=Math.max(1,Math.round(canvas.height*scale));thumb.getContext('2d').drawImage(canvas,0,0,thumb.width,thumb.height);
@@ -200,12 +219,12 @@ async function inspectFile(file) {
     state.pdf=pdf;state.loadingTask=loadingTask;state.pages=pages;state.name=file.name;
     ui.filename.textContent=file.name;ui['file-detail'].textContent=`${pages.length} halaman · ${(file.size/1024/1024).toFixed(2)} MB`;
     ui['file-info'].hidden=false;ui['page-count'].textContent=`${pages.length} halaman`;
-    drawRows();setBusy(false);showNotice(kind==='docx'?'Word dikonversi di browser. Periksa hasilnya: tata letak atau font dapat berbeda dari Microsoft Word.':'');
+    drawRows();setBusy(false);showNotice(kind==='docx'?'Word sudah diubah menjadi PDF. Periksa hasilnya karena tata letak atau huruf bisa berbeda.':'');
   } catch(error) {
     if(loadingTask) loadingTask.destroy();
     if(token!==state.token) return;
     setBusy(false);
-    const message=error?.name==='PasswordException'?'PDF dilindungi kata sandi. Gunakan PDF yang tidak terkunci.':(error?.message||'Format PDF tidak dapat dibaca.');
+    const message=error?.name==='PasswordException'?'PDF dilindungi kata sandi. Gunakan PDF yang tidak terkunci.':(error?.message||'Dokumen tidak bisa dibaca.');
     showNotice(`Dokumen tidak dapat dibuka. ${message}`);
   }
 }
@@ -219,19 +238,18 @@ ui['select-all'].addEventListener('click',()=>{state.pages.forEach(p=>p.selected
 ui['select-none'].addEventListener('click',()=>{state.pages.forEach(p=>p.selected=false);drawRows();updateSummary()});
 for(const button of document.querySelectorAll('[data-preview-filter]'))button.addEventListener('click',()=>{state.previewFilter=button.dataset.previewFilter;document.querySelectorAll('[data-preview-filter]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button))});drawRows()});
 for(const button of document.querySelectorAll('[data-print-filter]'))button.addEventListener('click',()=>{state.printFilter=button.dataset.printFilter;document.querySelectorAll('[data-print-filter]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button))});updateSummary()});
-$('skip-blank').addEventListener('change',()=>{savePrintOptions();updateSummary()});
 $('print-order').addEventListener('change',savePrintOptions);
 $('driver-reverse').addEventListener('change',savePrintOptions);
 ui.print.addEventListener('click',async()=>{
   const reverse=reverseForDriver($('print-order').value==='reverse',$('driver-reverse').checked);
-  const plan=printPlan(filterPages(state.pages,state.printFilter,true,$('skip-blank').checked),reverse);
+  const plan=printPlan(filterPages(state.pages,state.printFilter,true,true),reverse);
   if(!state.pdf || !state.settings || !plan.length) return;
-  if(plan.length>250) {showNotice('Maksimal 250 halaman per proses cetak. Kurangi pilihan atau jumlah salinan.');return;}
+  if(plan.length>250) {showNotice('Maksimal 250 halaman cetak setiap kali mencetak. Kurangi halaman atau jumlah salinan.');return;}
   const popup=window.open('','_blank');
-  if(!popup){showNotice('Browser memblokir jendela cetak. Izinkan pop-up untuk situs ini dan coba lagi.');return;}
+  if(!popup){showNotice('Jendela cetak diblokir. Izinkan jendela baru untuk situs ini, lalu coba lagi.');return;}
   popup.document.title='HY Print';
   popup.document.body.textContent='Menyiapkan halaman cetak. Mohon tunggu…';
-  state.printing=true;setBusy(true);showNotice('Menyiapkan halaman untuk dialog cetak…');
+  state.printing=true;setBusy(true);showNotice('Menyiapkan halaman untuk dicetak…');
   try {
     const cache=new Map();
     for(const item of plan) {
@@ -254,8 +272,8 @@ ui.print.addEventListener('click',async()=>{
     for(const item of plan){const section=popup.document.createElement('div');section.className='page';const image=popup.document.createElement('img');image.src=cache.get(`${item.number}-${item.color}`);image.alt='';section.append(image);popup.document.body.append(section);images.push(image);}
     await Promise.all(images.map(img=>img.decode()));
     popup.focus();popup.print();
-    showNotice('Dialog cetak dibuka. Pilih printer dan kertas, lalu pastikan salinan di dialog adalah 1.');
-  } catch(error){popup.close();showNotice('Halaman tidak dapat disiapkan untuk cetak: '+(error.message||'kesalahan tidak diketahui'));}
+    showNotice('Jendela cetak terbuka. Pilih printer dan kertas, lalu pilih 1 salinan.');
+  } catch(error){popup.close();showNotice('Halaman belum siap dicetak: '+(error.message||'kesalahan tidak diketahui'));}
   finally{state.printing=false;setBusy(false);}
 });
 loadSettings();

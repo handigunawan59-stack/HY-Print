@@ -113,9 +113,9 @@ export default {
     if (!path.startsWith('/api/')) return env.ASSETS.fetch(request);
     try {
       if (path === '/api/settings' && request.method === 'GET') return json(200, await getSettings(env));
-      if (path.startsWith('/api/admin/') && ['POST','PUT','PATCH','DELETE'].includes(request.method) && !allowedOrigin(request)) return json(403,{error:'Asal permintaan tidak diizinkan.'});
+      if (path.startsWith('/api/admin/') && ['POST','PUT','PATCH','DELETE'].includes(request.method) && !allowedOrigin(request)) return json(403,{error:'Permintaan tidak diizinkan. Muat ulang halaman lalu coba lagi.'});
       if (path === '/api/admin/login' && request.method === 'POST') {
-        if (!configured(env) || !env.LOGIN_LIMITER) return json(503,{error:'Admin belum dikonfigurasi.'});
+        if (!configured(env) || !env.LOGIN_LIMITER) return json(503,{error:'Pengaturan admin belum siap. Hubungi pemilik situs.'});
         const ip=request.headers.get('CF-Connecting-IP') || 'unknown';
         const {success} = await env.LOGIN_LIMITER.limit({key:`admin-login:${ip}`});
         if (!success) return json(429,{error:'Terlalu banyak percobaan. Coba lagi nanti.'},{'Retry-After':'60'});
@@ -125,7 +125,7 @@ export default {
         return json(200,{ok:true},{'Set-Cookie':sessionCookie(await issueToken(env.SESSION_SECRET, record?.version || 'bootstrap'))});
       }
       if (path === '/api/admin/password' && request.method === 'POST') {
-        if (!configured(env) || !env.LOGIN_LIMITER) return json(503,{error:'Admin belum dikonfigurasi.'});
+        if (!configured(env) || !env.LOGIN_LIMITER) return json(503,{error:'Pengaturan admin belum siap. Hubungi pemilik situs.'});
         if (!await authenticated(request,env)) return json(401,{error:'Sesi tidak aktif. Masuk kembali.'});
         const ip=request.headers.get('CF-Connecting-IP') || 'unknown';
         if (!(await env.LOGIN_LIMITER.limit({key:`admin-password:${ip}`})).success) return json(429,{error:'Terlalu banyak percobaan. Coba lagi nanti.'},{'Retry-After':'60'});
@@ -141,12 +141,12 @@ export default {
       if (path === '/api/admin/settings' && request.method === 'PUT') {
         if (!await authenticated(request,env)) return json(401,{error:'Masuk sebagai admin terlebih dahulu.'});
         const value = await parseJson(request);
-        if (!validSettings(value)) return json(400,{error:'Pengaturan tidak valid.'});
+        if (!validSettings(value)) return json(400,{error:'Periksa kembali harga dan batas warna.'});
         const settings = {threshold:value.threshold,bwPrice:value.bwPrice,colorPrice:value.colorPrice};
         await env.SETTINGS.put('settings',JSON.stringify(settings));
         return json(200,{ok:true,settings});
       }
       return json(404,{error:'Halaman tidak ditemukan.'});
-    } catch { return json(503,{error:'Layanan sementara tidak tersedia.'}); }
+    } catch { return json(503,{error:'Layanan belum tersedia. Coba lagi nanti.'}); }
   }
 };
