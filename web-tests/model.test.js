@@ -34,3 +34,16 @@ test('rejects rendered Word page that grew beyond its original page height', asy
   assert.equal(pageOverflow(1122, 1122), false);
   assert.equal(pageOverflow(1300, 1122), true);
 });
+
+test('print and preview filters use effective page color and preserve selection', async () => {
+  const { filterPages } = await import('../src/model.js');
+  const pages = [
+    {number:1, selected:true, color:false, copies:2},
+    {number:2, selected:true, color:true, copies:1},
+    {number:3, selected:false, color:true, copies:1},
+  ];
+  assert.deepEqual(filterPages(pages, 'all').map(p => p.number), [1, 2, 3]);
+  assert.deepEqual(filterPages(pages, 'color').map(p => p.number), [2, 3]);
+  assert.deepEqual(filterPages(pages, 'bw').map(p => p.number), [1]);
+  assert.deepEqual(filterPages(pages, 'color', true).map(p => p.number), [2]);
+});

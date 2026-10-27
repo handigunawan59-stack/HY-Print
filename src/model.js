@@ -27,3 +27,8 @@ export function documentKind(name) {
 export function pageOverflow(renderedHeight, pageHeight) {
   return Number.isFinite(pageHeight) && pageHeight > 0 && renderedHeight > pageHeight + 3;
 }
+export function filterPages(pages, mode = 'all', selectedOnly = false) {
+  if (!['all', 'color', 'bw'].includes(mode)) throw new RangeError('Invalid page filter');
+  return pages.filter(page => (!selectedOnly || page.selected) && (mode === 'all' || page.color === (mode === 'color')));
+}
+

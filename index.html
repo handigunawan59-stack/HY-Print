@@ -3,51 +3,64 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#f4f6fb" />
+  <meta name="theme-color" content="#f2f2f7" />
   <link rel="icon" href="/hy-printing-mark.svg" type="image/svg+xml" />
-  <meta name="description" content="Periksa halaman PDF, hitung biaya, dan siapkan cetak dari browser Windows." />
+  <meta name="description" content="Periksa, hitung, dan siapkan cetak PDF atau Word di browser Windows." />
   <title>HY Print — Ruang kerja cetak</title>
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand"><span class="brand-icon"><img src="/hy-printing-mark.svg" alt="" /></span><span><strong>HY Print</strong><small>RUANG KERJA CETAK</small></span></div>
-      <div class="nav-label">Menu utama</div>
-      <div class="nav-active"><span aria-hidden="true">▣</span> Cetak dokumen</div>
-      <div class="sidebar-note"><span class="shield" aria-hidden="true">✓</span><div><strong>Privasi dokumen</strong><p>Dokumen diproses di browser Anda. File tidak diunggah ke server.</p></div></div>
-    </aside>
-    <main class="main">
-      <header class="page-header"><div><div class="breadcrumb">Ruang kerja <span>/</span> Cetak dokumen</div><h1>Siapkan cetakan</h1><p>Pilih dokumen, periksa halaman, dan hitung biaya sebelum mencetak.</p></div><div class="local-badge"><span></span> Diproses di perangkat</div></header>
-      <div class="workspace">
-        <section class="document-card card" aria-labelledby="doc-heading">
-          <div class="card-heading"><div><h2 id="doc-heading">Dokumen</h2><p>Pilih PDF atau Word yang akan dicetak.</p></div><span class="file-count" id="page-count">Belum ada file</span></div>
-          <label class="drop-zone" for="file"><span class="upload-icon" aria-hidden="true">＋</span><span><strong>Pilih dokumen PDF atau Word</strong><small>Klik atau seret file PDF atau DOCX ke sini</small></span><span class="file-pill">PDF / DOCX</span></label>
-          <input id="file" type="file" accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="visually-hidden" />
-          <p class="word-hint">Word .docx dikonversi menjadi PDF di browser. Periksa hasilnya karena tata letak dapat berbeda; format .doc lama perlu disimpan ulang di Word.</p>
-          <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
-          <div id="file-info" class="file-info" hidden><span class="pdf-icon">PDF</span><div class="filename"><strong id="filename"></strong><small id="file-detail"></small></div><button class="text-button" id="change-file" type="button">Ganti file</button></div>
-          <div class="section-heading"><div><h3>Halaman dokumen</h3><p>Pilih halaman, mode dan jumlah salinan.</p></div><div class="actions"><button class="text-button" id="select-all" type="button" disabled>Pilih semua</button><button class="text-button" id="select-none" type="button" disabled>Kosongkan</button></div></div>
-          <div class="table-wrap"><table><thead><tr><th>Cetak</th><th>Halaman</th><th>Ukuran dokumen</th><th>Mode</th><th>Salinan</th></tr></thead><tbody id="pages"><tr><td colspan="5" class="empty">Halaman akan muncul setelah PDF dipilih.</td></tr></tbody></table></div>
-          <p class="microcopy">Warna otomatis adalah perkiraan. Anda dapat mengubah mode setiap halaman.</p>
-          <div class="preview-heading"><h3>Pratinjau halaman</h3><span id="preview-label">Belum ada halaman</span></div>
-          <div class="preview-area" id="preview-area"><p id="preview-empty">Pilih halaman untuk melihat pratinjau</p><canvas id="preview" hidden aria-label="Pratinjau halaman PDF"></canvas></div>
-        </section>
-        <section class="settings-card card" aria-labelledby="settings-heading">
-          <div class="card-heading"><div><h2 id="settings-heading">Pengaturan cetak</h2><p>Sesuaikan sebelum membuka dialog cetak.</p></div></div>
-          <div class="browser-info"><span aria-hidden="true">ⓘ</span><p>Printer dan kertas dipilih pada dialog cetak browser. Pastikan pengaturannya sesuai sebelum mencetak.</p></div>
-          <div class="setting-group"><label for="threshold">Ambang deteksi warna</label><p>Warna di bawah ambang diabaikan.</p><div class="threshold-row"><div class="input-suffix"><input id="threshold" type="number" min="0.1" max="100" step="0.1" value="1" /><span>%</span></div><button id="apply-detection" class="secondary" type="button" disabled>Terapkan deteksi</button></div></div>
-          <div class="divider"></div><h3>Harga per halaman</h3><p class="settings-description">Atur harga sesuai usaha Anda. Tersimpan di browser ini.</p>
-          <div class="price-fields"><div class="setting-group"><label for="bw-price">Hitam putih</label><div class="input-prefix"><span>Rp</span><input id="bw-price" type="number" min="0" max="10000000" step="100" value="500" /></div></div><div class="setting-group"><label for="color-price">Berwarna</label><div class="input-prefix"><span>Rp</span><input id="color-price" type="number" min="0" max="10000000" step="100" value="1500" /></div></div></div>
-          <div class="estimate"><span>Estimasi biaya</span><strong id="total">Rp 0</strong><p id="summary">0 hitam putih · 0 warna</p></div>
-          <button id="print" class="primary" type="button" disabled><span aria-hidden="true">▣</span> Buka dialog cetak</button>
-          <p class="print-note">Di dialog cetak, pilih <b>semua halaman</b> dan <b>1 salinan</b>. Salinan sudah disiapkan oleh HY Print. Untuk halaman campuran, pilih mode warna pada printer.</p>
-        </section>
-      </div>
-      <footer><span>HY Print</span><span>Untuk browser Windows · Cetak melalui dialog browser</span></footer>
-    </main>
-  </div>
+  <header class="topbar">
+    <div class="brand"><img src="/hy-printing-mark.svg" alt="" /><div><strong>HY Print</strong><small>Ruang kerja cetak</small></div></div>
+    <div class="top-actions"><span class="privacy"><span aria-hidden="true">●</span> Dokumen diproses di perangkat</span><button id="admin-open" class="button button-light" type="button">⚙ &nbsp;Admin</button></div>
+  </header>
+  <main class="main">
+    <div class="page-heading"><div><h1>Siapkan cetakan</h1><p>Pilih dokumen, periksa halaman, dan tentukan yang ingin dicetak.</p></div><span class="device-label">Browser Windows</span></div>
+    <div class="workspace">
+      <section class="document-card card" aria-labelledby="doc-heading">
+        <div class="section-top"><div><h2 id="doc-heading">Dokumen &amp; halaman</h2><p>PDF dan Word diproses di browser Anda.</p></div><span class="file-count" id="page-count">Belum ada file</span></div>
+        <label class="drop-zone" for="file"><span class="upload-icon" aria-hidden="true">＋</span><span><strong>Pilih dokumen PDF atau Word</strong><small>Klik atau seret file ke sini</small></span><span class="file-pill">PDF / DOCX</span></label>
+        <input id="file" type="file" accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="visually-hidden" />
+        <p class="word-hint">Word .docx dikonversi di browser dan tata letaknya dapat berbeda. Simpan .doc lama sebagai .docx atau PDF.</p>
+        <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+        <div id="file-info" class="file-info" hidden><span class="pdf-icon">FILE</span><div class="filename"><strong id="filename"></strong><small id="file-detail"></small></div><button class="text-button" id="change-file" type="button">Ganti file</button></div>
+        <div class="preview-toolbar"><div><h3>Pratinjau halaman</h3><p>Atur mode dan salinan pada tiap halaman.</p></div><div class="segments" role="group" aria-label="Filter pratinjau"><button type="button" class="active" data-preview-filter="all" aria-pressed="true">Semua</button><button type="button" data-preview-filter="color" aria-pressed="false">Warna</button><button type="button" data-preview-filter="bw" aria-pressed="false">Hitam putih</button></div></div>
+        <div class="page-actions"><span id="preview-label">Belum ada halaman</span><div><button class="text-button" id="select-all" type="button" disabled>Pilih semua</button><button class="text-button" id="select-none" type="button" disabled>Kosongkan</button></div></div>
+        <div id="pages" class="page-grid"><p class="empty">Pratinjau semua halaman muncul di sini setelah dokumen dipilih.</p></div>
+        <p class="microcopy">Deteksi warna merupakan perkiraan. Klik mode untuk memperbaiki hasil per halaman.</p>
+      </section>
+      <aside class="settings-card card" aria-labelledby="settings-heading">
+        <div class="section-top"><div><h2 id="settings-heading">Ringkasan cetak</h2><p>Pastikan pilihan sesuai sebelum mencetak.</p></div></div>
+        <div class="field-label">Halaman yang dicetak</div>
+        <div class="segments print-segments" role="group" aria-label="Filter cetak"><button type="button" class="active" data-print-filter="all" aria-pressed="true">Semua</button><button type="button" data-print-filter="color" aria-pressed="false">Warna</button><button type="button" data-print-filter="bw" aria-pressed="false">Hitam putih</button></div>
+        <p class="hint">Hanya halaman yang dicentang dan sesuai filter akan dicetak.</p>
+        <div class="divider"></div>
+        <div class="rate-heading"><h3>Harga per halaman</h3><span>Ditetapkan admin</span></div>
+        <div class="rate-row"><span>Hitam putih</span><strong id="bw-rate">—</strong></div>
+        <div class="rate-row"><span>Berwarna</span><strong id="color-rate">—</strong></div>
+        <div class="rate-row"><span>Ambang warna</span><strong id="threshold-info">—</strong></div>
+        <p id="settings-status" class="settings-status" role="status">Memuat pengaturan admin…</p>
+        <button id="settings-retry" class="text-button" type="button" hidden>Muat ulang pengaturan</button>
+        <div class="estimate"><span>Estimasi biaya</span><strong id="total">Rp 0</strong><p id="summary">0 hitam putih · 0 warna</p></div>
+        <button id="print" class="primary" type="button" disabled><span aria-hidden="true">▣</span> Buka dialog cetak</button>
+        <p class="print-note">Pilih printer dan kertas pada dialog browser. Pilih <b>semua halaman</b> dan <b>1 salinan</b>; salinan sudah disiapkan di sini.</p>
+      </aside>
+    </div>
+    <footer><span>HY Print</span><span>File tidak diunggah ke server · Cetak melalui dialog browser</span></footer>
+  </main>
+  <dialog id="preview-dialog" class="preview-dialog" aria-labelledby="preview-title">
+    <div class="dialog-top"><div><h2 id="preview-title">Pratinjau halaman</h2><p id="preview-meta"></p></div><button id="preview-close" class="icon-button" type="button" aria-label="Tutup pratinjau">×</button></div>
+    <div class="full-preview"><canvas id="preview-canvas" aria-label="Pratinjau halaman diperbesar"></canvas></div>
+  </dialog>
+  <dialog id="admin-dialog" aria-labelledby="admin-title">
+    <div class="dialog-top"><div><h2 id="admin-title">Pengaturan admin</h2><p>Kelola tarif dan deteksi warna untuk seluruh pengguna.</p></div><button id="admin-close" class="icon-button" type="button" aria-label="Tutup">×</button></div>
+    <p id="admin-message" class="notice" role="status" aria-live="polite" hidden></p>
+    <form id="login-form" hidden><label for="admin-password">Kata sandi admin</label><input id="admin-password" type="password" autocomplete="current-password" required /><button class="primary" type="submit">Masuk</button></form>
+    <form id="admin-form" hidden>
+      <label for="threshold">Ambang deteksi warna (%)</label><input id="threshold" type="number" min="0.1" max="100" step="0.1" required /><p class="admin-hint">Warna di bawah ambang diabaikan.</p>
+      <div class="price-fields"><div><label for="bw-price">Hitam putih (Rp)</label><input id="bw-price" type="number" min="0" max="10000000" step="1" required /></div><div><label for="color-price">Berwarna (Rp)</label><input id="color-price" type="number" min="0" max="10000000" step="1" required /></div></div>
+      <button class="primary" type="submit">Simpan pengaturan</button><button id="admin-logout" class="button button-light" type="button">Keluar</button>
+    </form>
+  </dialog>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
-
-

@@ -1,18 +1,22 @@
 # Cloudflare Workers
 
-HY Print dapat di-host sebagai situs statis di Cloudflare Workers. Pemrosesan dokumen terjadi di browser; deployment ini tidak memerlukan database atau secret aplikasi.
+HY Print menggunakan Worker untuk API admin dan aset statis, Workers KV untuk pengaturan, serta pembatas percobaan login. Dokumen pelanggan tetap diproses di browser.
 
-## Deployment manual
+## Deployment
 
-Prasyarat: Node.js dan akun Cloudflare dengan izin Workers. Dari direktori proyek:
+Prasyarat: Node.js dan akses ke akun Cloudflare yang memiliki Worker, namespace KV, dan izin deployment. Nilai rahasia **tidak** boleh dimasukkan ke Git, source, aset publik, atau file contoh. `wrangler.jsonc` berisi ID namespace dan binding, bukan nilainya.
+
+Gunakan secret `ADMIN_PASSWORD` untuk kata sandi dan `SESSION_SECRET` untuk kunci sesi acak yang berbeda (minimal 32 karakter). Atur secret dengan `npx wrangler secret put ADMIN_PASSWORD` dan `npx wrangler secret put SESSION_SECRET`; masukkan nilainya secara privat saat diminta. Kemudian:
 
 ```powershell
 npm ci
+npm test
 npm run build
-npx wrangler login
 npx wrangler deploy
 ```
 
-Jika Wrangler sudah login pada akun yang benar, langkah login dapat dilewati. `wrangler.jsonc` mengunggah direktori `dist/` sebagai aset statis. Wrangler akan menampilkan URL deployment setelah berhasil. Bila akun memiliki lebih dari satu akun Cloudflare, pilih akun yang sesuai saat diminta.
+`wrangler secret put` memperbarui secret pada Worker yang dipilih. Untuk mengganti kata sandi, perbarui secret `ADMIN_PASSWORD`; jangan mengunggahnya ke GitHub. Secret sesi independen mencegah kata sandi digunakan sebagai kunci token. Pembatas login bekerja per lokasi Cloudflare dan tidak menggantikan kata sandi yang kuat. Pengaturan KV bersifat eventually consistent, sehingga perubahan bisa terlambat terlihat di lokasi lain.
 
-Setiap `wrangler deploy` memperbarui situs produksi pada Worker `hy-print`. Jangan menaruh dokumen pelanggan, kunci API, file `.env`, atau hasil print pada direktori `dist/`; isinya menjadi publik. Untuk pengaturan domain sendiri dan CI/CD, lihat [dokumentasi Cloudflare Workers Static Assets](https://developers.cloudflare.com/workers/static-assets/).
+Untuk pengembangan lokal, jalankan Worker dengan `npx wrangler dev --local` setelah build, dan atur secret pengujian di `.dev.vars` yang diabaikan Git. Gunakan nilai khusus pengujian, bukan kata sandi produksi. Vite saja tidak menyediakan API admin.
+
+Jangan menaruh dokumen pelanggan, kunci API, file `.env`, atau hasil print pada `dist/`, karena aset yang diterbitkan bersifat publik.
