@@ -6,3 +6,15 @@ __pycache__/
 *.py[cod]
 *.spec
 work/
+
+# Browser build and local Cloudflare state
+node_modules/
+dist/
+.wrangler/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example
+.playwright-cli/
