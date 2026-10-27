@@ -1,12 +1,17 @@
 import './style.css';
 import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import {paperName, classifyColor, colorCoverage, calculate, printPlan, documentKind, filterPages} from './model.js';
+import {paperName, classifyColor, colorCoverage, isBlankPage, calculate, printPlan, reverseForDriver, printPreferences, storePrintPreferences, documentKind, filterPages} from './model.js';
+import {validatePasswordChange} from './admin-password.js';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 const $ = id => document.getElementById(id);
-const ui = Object.fromEntries(['file','notice','file-info','filename','file-detail','page-count','pages','select-all','select-none','change-file','preview-label','threshold','bw-price','color-price','bw-rate','color-rate','threshold-info','settings-status','settings-retry','total','summary','print','admin-open','admin-close','admin-dialog','admin-message','login-form','admin-form','admin-password','admin-logout','preview-dialog','preview-title','preview-meta','preview-close','preview-canvas'].map(id=>[id,$(id)]));
+const ui = Object.fromEntries(['file','notice','file-info','filename','file-detail','page-count','pages','select-all','select-none','change-file','preview-label','threshold','bw-price','color-price','bw-rate','color-rate','threshold-info','settings-status','settings-retry','total','summary','print','admin-open','admin-close','admin-dialog','admin-message','login-form','admin-form','admin-password','admin-logout','preview-dialog','preview-title','preview-meta','preview-close','preview-canvas','password-details','password-form','current-password','new-password','confirm-password'].map(id=>[id,$(id)]));
 const state = {pdf:null,pages:[],name:'',token:0,busy:false,printing:false,loadingTask:null,settings:null,previewFilter:'all',printFilter:'all'};
+let preferences={reverse:true,driverReverse:true,skipBlank:false};
+try {preferences=printPreferences(localStorage)} catch {}
+$('print-order').value=preferences.reverse?'reverse':'forward';$('driver-reverse').checked=preferences.driverReverse;$('skip-blank').checked=preferences.skipBlank;
+function savePrintOptions(){try {storePrintPreferences(localStorage,{reverse:$('print-order').value==='reverse',driverReverse:$('driver-reverse').checked,skipBlank:$('skip-blank').checked})} catch {}}
 const rupiah = n => 'Rp '+new Intl.NumberFormat('id-ID').format(n);
 function showNotice(text) { ui.notice.textContent=text; ui.notice.hidden=!text; }
 function showAdmin(text) { ui['admin-message'].textContent=text; ui['admin-message'].hidden=!text; }
@@ -15,10 +20,10 @@ function clampInput(input,min,max,fallback) {
   input.value=value; return value;
 }
 function updateSummary() {
-  const pages=filterPages(state.pages,state.printFilter,true);
+  const pages=filterPages(state.pages,state.printFilter,true,$('skip-blank').checked);
   const values=calculate(pages,state.settings?.bwPrice??0,state.settings?.colorPrice??0);
   ui.total.textContent=rupiah(values.total);
-  ui.summary.textContent=`${values.bw} hitam putih · ${values.color} warna`;
+  ui.summary.textContent=`${pages.length} halaman · ${values.bw+values.color} lembar · ${values.bw} hitam putih · ${values.color} warna`;
   ui.print.disabled=state.busy || !state.pdf || !state.settings || values.bw+values.color===0;
 }
 function setBusy(value) {
@@ -52,7 +57,10 @@ function drawRows() {
     mode.addEventListener('change',()=>{page.color=mode.value==='color';drawRows();updateSummary()});
     const copies=el('input',{type:'number',min:1,max:99,step:1,'aria-label':`Salinan halaman ${page.number}`});copies.value=page.copies;
     copies.addEventListener('change',()=>{page.copies=Math.trunc(clampInput(copies,1,99,1));copies.value=page.copies;updateSummary()});
-    controls.append(mode,copies);tile.append(imageArea,header,controls);ui.pages.append(tile);
+    const blank=el('select',{'aria-label':`Status halaman kosong ${page.number}`,title:'Periksa deteksi dan ubah status jika perlu'});
+    blank.append(el('option',{value:'content'},'Ada isi'),el('option',{value:'blank'},'Kosong'));blank.value=page.blank?'blank':'content';
+    blank.addEventListener('change',()=>{page.blank=blank.value==='blank';drawRows();updateSummary()});
+    controls.append(mode,copies);tile.append(imageArea,header,controls,blank);ui.pages.append(tile);
   });
 }
 let previewToken=0;
@@ -103,15 +111,22 @@ async function api(path,options={}) {
   return data;
 }
 async function openAdmin() {
-  showAdmin('');ui['login-form'].hidden=true;ui['admin-form'].hidden=true;ui['admin-dialog'].showModal();
-  try {await api('/api/admin/session');ui['admin-form'].hidden=false;} catch(error) {ui['login-form'].hidden=false;if(error.status!==401)showAdmin(error.message);}
+  showAdmin('');ui['login-form'].hidden=true;ui['admin-form'].hidden=true;ui['password-details'].hidden=true;ui['admin-dialog'].showModal();
+  try {await api('/api/admin/session');setAdminAuthenticated(true);} catch(error) {setAdminAuthenticated(false);if(error.status!==401)showAdmin(error.message);}
+}
+function setAdminAuthenticated(authenticated) {
+  ui['login-form'].hidden=authenticated;
+  ui['admin-form'].hidden=!authenticated;
+  ui['password-details'].hidden=!authenticated;
+  if(!authenticated) { ui['password-form'].reset();ui['password-details'].open=false; }
 }
 ui['admin-open'].addEventListener('click',openAdmin);
 ui['admin-close'].addEventListener('click',()=>{ui['admin-password'].value='';ui['admin-dialog'].close()});
-ui['admin-dialog'].addEventListener('close',()=>{ui['admin-password'].value='';showAdmin('')});
+ui['admin-dialog'].addEventListener('close',()=>{ui['admin-password'].value='';ui['password-form'].reset();ui['password-details'].open=false;showAdmin('')});
+ui['password-details'].addEventListener('toggle',()=>{if(!ui['password-details'].open)ui['password-form'].reset()});
 ui['login-form'].addEventListener('submit',async event=>{
   event.preventDefault();showAdmin('');const button=ui['login-form'].querySelector('button');button.disabled=true;
-  try {await api('/api/admin/login',{method:'POST',body:JSON.stringify({password:ui['admin-password'].value})});ui['admin-password'].value='';ui['login-form'].hidden=true;ui['admin-form'].hidden=false;}
+  try {await api('/api/admin/login',{method:'POST',body:JSON.stringify({password:ui['admin-password'].value})});ui['admin-password'].value='';setAdminAuthenticated(true);}
   catch(error){showAdmin(error.message)} finally{button.disabled=false;}
 });
 ui['admin-form'].addEventListener('submit',async event=>{
@@ -121,9 +136,26 @@ ui['admin-form'].addEventListener('submit',async event=>{
     const result=await api('/api/admin/settings',{method:'PUT',body:JSON.stringify({threshold,bwPrice,colorPrice})});
     applySettings(result.settings,{reclassify:true});
     showAdmin('Pengaturan tersimpan. Deteksi warna diterapkan ulang. Perangkat lain mungkin memerlukan waktu untuk menerima perubahan.');
-  } catch(error){showAdmin(error.message);if(error.status===401){ui['admin-form'].hidden=true;ui['login-form'].hidden=false;}} finally{button.disabled=false;}
+  } catch(error){showAdmin(error.message);if(error.status===401)setAdminAuthenticated(false);} finally{button.disabled=false;}
 });
-ui['admin-logout'].addEventListener('click',async()=>{try{await api('/api/admin/logout',{method:'POST'});ui['admin-form'].hidden=true;ui['login-form'].hidden=false;showAdmin('Anda telah keluar.')}catch(error){showAdmin(error.message)}});
+ui['password-form'].addEventListener('submit',async event=>{
+  event.preventDefault();showAdmin('');
+  const currentPassword=ui['current-password'].value,newPassword=ui['new-password'].value;
+  const validation=validatePasswordChange(currentPassword,newPassword,ui['confirm-password'].value);
+  if(validation){showAdmin(validation);return;}
+  const button=ui['password-form'].querySelector('button[type=submit]');button.disabled=true;
+  try {
+    await api('/api/admin/password',{method:'POST',body:JSON.stringify({currentPassword,newPassword})});
+    setAdminAuthenticated(false);
+    showAdmin('Kata sandi berhasil diubah. Masuk kembali dengan kata sandi baru.');
+  } catch(error){
+    if(error.status===401 || error.status===409){setAdminAuthenticated(false);showAdmin('Sesi berakhir atau kata sandi telah berubah. Masuk kembali.');}
+    else if(error.status===403)showAdmin('Kata sandi saat ini salah atau permintaan tidak diizinkan.');
+    else if(error.status===400)showAdmin('Kata sandi baru harus berbeda dari sebelumnya dan terdiri dari 12–256 karakter.');
+    else showAdmin(error.message);
+  } finally{button.disabled=false;}
+});
+ui['admin-logout'].addEventListener('click',async()=>{try{await api('/api/admin/logout',{method:'POST'});setAdminAuthenticated(false);showAdmin('Anda telah keluar.')}catch(error){showAdmin(error.message)}});
 ui['settings-retry'].addEventListener('click',()=>loadSettings({reclassify:true}));
 async function inspectFile(file) {
   if(!file) return;
@@ -154,11 +186,12 @@ async function inspectFile(file) {
       const canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
       const context=canvas.getContext('2d',{willReadFrequently:true});
       await page.render({canvasContext:context,viewport,background:'#fff'}).promise;
-      const coverage=colorCoverage(context.getImageData(0,0,canvas.width,canvas.height).data);
+      const pixelData=context.getImageData(0,0,canvas.width,canvas.height).data;
+      const coverage=colorCoverage(pixelData),blank=isBlankPage(pixelData);
       const width=viewport.width*25.4/72,height=viewport.height*25.4/72;
       const scale=Math.min(180/canvas.width,210/canvas.height,1),thumb=document.createElement('canvas');
       thumb.width=Math.max(1,Math.round(canvas.width*scale));thumb.height=Math.max(1,Math.round(canvas.height*scale));thumb.getContext('2d').drawImage(canvas,0,0,thumb.width,thumb.height);
-      pages.push({number:n,width,height,paper:paperName(width,height),coverage,color:classifyColor(coverage,state.settings.threshold),selected:true,copies:1,thumb:thumb.toDataURL('image/jpeg',.78)});
+      pages.push({number:n,width,height,paper:paperName(width,height),coverage,color:classifyColor(coverage,state.settings.threshold),blank,selected:true,copies:1,thumb:thumb.toDataURL('image/jpeg',.78)});
       canvas.width=canvas.height=thumb.width=thumb.height=0;
       if(token!==state.token){loadingTask.destroy();return;}
       showNotice(`Memeriksa halaman ${n} dari ${pdf.numPages}…`);
@@ -186,8 +219,12 @@ ui['select-all'].addEventListener('click',()=>{state.pages.forEach(p=>p.selected
 ui['select-none'].addEventListener('click',()=>{state.pages.forEach(p=>p.selected=false);drawRows();updateSummary()});
 for(const button of document.querySelectorAll('[data-preview-filter]'))button.addEventListener('click',()=>{state.previewFilter=button.dataset.previewFilter;document.querySelectorAll('[data-preview-filter]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button))});drawRows()});
 for(const button of document.querySelectorAll('[data-print-filter]'))button.addEventListener('click',()=>{state.printFilter=button.dataset.printFilter;document.querySelectorAll('[data-print-filter]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button))});updateSummary()});
+$('skip-blank').addEventListener('change',()=>{savePrintOptions();updateSummary()});
+$('print-order').addEventListener('change',savePrintOptions);
+$('driver-reverse').addEventListener('change',savePrintOptions);
 ui.print.addEventListener('click',async()=>{
-  const plan=printPlan(filterPages(state.pages,state.printFilter,true));
+  const reverse=reverseForDriver($('print-order').value==='reverse',$('driver-reverse').checked);
+  const plan=printPlan(filterPages(state.pages,state.printFilter,true,$('skip-blank').checked),reverse);
   if(!state.pdf || !state.settings || !plan.length) return;
   if(plan.length>250) {showNotice('Maksimal 250 halaman per proses cetak. Kurangi pilihan atau jumlah salinan.');return;}
   const popup=window.open('','_blank');

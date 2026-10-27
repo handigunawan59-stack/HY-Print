@@ -8,16 +8,18 @@ HY Print membantu menyiapkan cetakan dari browser Windows. Dokumen PDF dan DOCX 
 
 - Pratinjau semua halaman, halaman warna saja, atau hitam putih saja. Klik gambar halaman untuk melihatnya lebih besar; mode dan salinan dapat diubah per halaman.
 - Pilih semua halaman, hanya warna, atau hanya hitam putih untuk dicetak. Hanya halaman yang dicentang dan sesuai filter yang disertakan dalam perhitungan dan cetakan.
-- Admin mengatur tarif per halaman dan ambang deteksi warna untuk pengguna situs. Perubahan pengaturan mungkin memerlukan waktu untuk tersebar ke lokasi lain.
+- Admin mengatur tarif dan ambang warna, serta dapat mengganti kata sandi dari panel admin. Perubahan tarif atau ambang mungkin memerlukan waktu untuk tersebar ke lokasi lain.
+- Halaman putih terdeteksi secara konservatif, dapat diperiksa atau dikoreksi manual, dan dapat dilewati dari perhitungan serta cetakan.
+- Pilih urutan halaman belakang ke depan dan sesuaikan opsi kompensasi dengan pengaturan pembalikan pada printer.
 - DOCX dikonversi menjadi PDF di browser. Tata letak, font, gambar, dan pemisahan halaman dapat berbeda dari Microsoft Word; jika isi tidak dapat ditampung, simpan sebagai PDF di Word.
 
 ## Cara menggunakan
 
 Buka situs di browser modern pada Windows, lalu pilih PDF atau DOCX. Periksa halaman, pilih mode dan salinannya, kemudian pilih filter cetak. Di dialog cetak browser, pilih printer dan kertas, lalu pilih **semua halaman** dan **1 salinan** karena HY Print sudah menyiapkan jumlah salinan.
 
-Untuk mengubah harga atau ambang, pilih **Admin**, masuk, lalu simpan pengaturan. Tarif dan ambang disimpan pada Cloudflare; dokumen pelanggan tetap di browser. Nilai awal tersedia jika belum ada pengaturan yang tersimpan.
+Untuk mengubah harga, ambang, atau kata sandi, pilih **Admin** dan masuk. Kata sandi baru minimal 12 karakter; setelah diganti, masuk kembali dengan kata sandi baru. Tarif dan ambang disimpan pada Cloudflare; dokumen pelanggan tetap di browser. Nilai awal tersedia jika belum ada pengaturan yang tersimpan.
 
-Deteksi warna adalah estimasi, bukan jaminan 100% atau pengukuran tinta. Halaman hitam putih dikirim sebagai gambar abu-abu, tetapi driver printer menentukan penggunaan tinta. Printer dan ukuran kertas dipilih melalui dialog browser. Hasil cetak fisik bergantung pada printer dan driver. File `.doc` lama harus disimpan sebagai `.docx` atau PDF terlebih dahulu.
+Deteksi halaman kosong mempertahankan tanda sekecil apa pun; hasil scan berisik dapat dianggap berisi dan bisa dikoreksi manual. Browser tidak dapat membaca atau mengunci pengaturan urutan driver. Jika printer juga diatur membalik urutan, aktifkan opsi kompensasi yang sesuai dan periksa hasilnya. Deteksi warna adalah estimasi, bukan jaminan 100% atau pengukuran tinta. Halaman hitam putih dikirim sebagai gambar abu-abu, tetapi driver printer menentukan penggunaan tinta. Printer dan ukuran kertas dipilih melalui dialog browser. Hasil cetak fisik bergantung pada printer dan driver. File `.doc` lama harus disimpan sebagai `.docx` atau PDF terlebih dahulu.
 
 ## Pengembangan dan deployment
 

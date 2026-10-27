@@ -23,16 +23,21 @@
         <p class="word-hint">Word .docx dikonversi di browser dan tata letaknya dapat berbeda. Simpan .doc lama sebagai .docx atau PDF.</p>
         <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
         <div id="file-info" class="file-info" hidden><span class="pdf-icon">FILE</span><div class="filename"><strong id="filename"></strong><small id="file-detail"></small></div><button class="text-button" id="change-file" type="button">Ganti file</button></div>
-        <div class="preview-toolbar"><div><h3>Pratinjau halaman</h3><p>Atur mode dan salinan pada tiap halaman.</p></div><div class="segments" role="group" aria-label="Filter pratinjau"><button type="button" class="active" data-preview-filter="all" aria-pressed="true">Semua</button><button type="button" data-preview-filter="color" aria-pressed="false">Warna</button><button type="button" data-preview-filter="bw" aria-pressed="false">Hitam putih</button></div></div>
+        <div class="preview-toolbar"><div><h3>Pratinjau halaman</h3><p>Atur mode dan salinan pada tiap halaman.</p></div><div class="segments" role="group" aria-label="Filter pratinjau"><button type="button" class="active" data-preview-filter="all" aria-pressed="true">Semua</button><button type="button" data-preview-filter="color" aria-pressed="false">Warna</button><button type="button" data-preview-filter="bw" aria-pressed="false">Hitam putih</button><button type="button" data-preview-filter="blank" aria-pressed="false">Kosong</button></div></div>
         <div class="page-actions"><span id="preview-label">Belum ada halaman</span><div><button class="text-button" id="select-all" type="button" disabled>Pilih semua</button><button class="text-button" id="select-none" type="button" disabled>Kosongkan</button></div></div>
         <div id="pages" class="page-grid"><p class="empty">Pratinjau semua halaman muncul di sini setelah dokumen dipilih.</p></div>
-        <p class="microcopy">Deteksi warna merupakan perkiraan. Klik mode untuk memperbaiki hasil per halaman.</p>
+        <p class="microcopy">Deteksi warna dan halaman kosong merupakan perkiraan. Periksa dan ubah status halaman jika perlu.</p>
       </section>
       <aside class="settings-card card" aria-labelledby="settings-heading">
         <div class="section-top"><div><h2 id="settings-heading">Ringkasan cetak</h2><p>Pastikan pilihan sesuai sebelum mencetak.</p></div></div>
         <div class="field-label">Halaman yang dicetak</div>
         <div class="segments print-segments" role="group" aria-label="Filter cetak"><button type="button" class="active" data-print-filter="all" aria-pressed="true">Semua</button><button type="button" data-print-filter="color" aria-pressed="false">Warna</button><button type="button" data-print-filter="bw" aria-pressed="false">Hitam putih</button></div>
         <p class="hint">Hanya halaman yang dicentang dan sesuai filter akan dicetak.</p>
+        <label class="print-option"><input id="skip-blank" type="checkbox" /> <span>Lewati halaman yang ditandai kosong</span></label>
+        <label class="order-label" for="print-order">Urutan hasil cetak</label>
+        <select id="print-order"><option value="forward">Halaman depan ke belakang</option><option value="reverse">Halaman belakang ke depan</option></select>
+        <label class="print-option"><input id="driver-reverse" type="checkbox" /> <span>Printer juga diatur mencetak dari belakang</span></label>
+        <p class="hint">Opsi printer dipilih sendiri, bukan dideteksi otomatis. Cocokkan dengan dialog cetak agar urutan tidak berbalik dua kali; browser tidak dapat mengunci pengaturan printer.</p>
         <div class="divider"></div>
         <div class="rate-heading"><h3>Harga per halaman</h3><span>Ditetapkan admin</span></div>
         <div class="rate-row"><span>Hitam putih</span><strong id="bw-rate">—</strong></div>
@@ -60,6 +65,19 @@
       <div class="price-fields"><div><label for="bw-price">Hitam putih (Rp)</label><input id="bw-price" type="number" min="0" max="10000000" step="1" required /></div><div><label for="color-price">Berwarna (Rp)</label><input id="color-price" type="number" min="0" max="10000000" step="1" required /></div></div>
       <button class="primary" type="submit">Simpan pengaturan</button><button id="admin-logout" class="button button-light" type="button">Keluar</button>
     </form>
+    <details id="password-details" class="password-details" hidden>
+      <summary>Ganti kata sandi</summary>
+      <form id="password-form">
+        <label for="current-password">Kata sandi saat ini</label>
+        <input id="current-password" type="password" autocomplete="current-password" maxlength="256" required />
+        <label for="new-password">Kata sandi baru</label>
+        <input id="new-password" type="password" autocomplete="new-password" minlength="12" maxlength="256" required aria-describedby="password-hint" />
+        <p id="password-hint" class="admin-hint">Minimal 12 karakter; gunakan kata sandi yang unik.</p>
+        <label for="confirm-password">Ulangi kata sandi baru</label>
+        <input id="confirm-password" type="password" autocomplete="new-password" minlength="12" maxlength="256" required />
+        <button class="primary" type="submit">Simpan kata sandi baru</button>
+      </form>
+    </details>
   </dialog>
   <script type="module" src="/src/main.js"></script>
 </body>

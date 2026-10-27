@@ -17,7 +17,8 @@ function allowedOrigin(request) {
 }
 function configured(env) {
   return typeof env.ADMIN_PASSWORD === 'string' && env.ADMIN_PASSWORD.length > 0
-    && typeof env.SESSION_SECRET === 'string' && env.SESSION_SECRET.length >= 32;
+    && typeof env.SESSION_SECRET === 'string' && env.SESSION_SECRET.length >= 32
+    && typeof env.PASSWORD_PEPPER === 'string' && env.PASSWORD_PEPPER.length >= 32 && !!env.AUTH_DB;
 }
 async function parseJson(request) {
   if (!request.headers.get('Content-Type')?.toLowerCase().startsWith('application/json')) return null;
@@ -45,10 +46,10 @@ function unbase64url(value) {
 async function keyFor(secret) {
   return crypto.subtle.importKey('raw', encoder.encode(secret), {name:'HMAC', hash:'SHA-256'}, false, ['sign','verify']);
 }
-async function issueToken(secret) {
+async function issueToken(secret, version) {
   const nonce = crypto.getRandomValues(new Uint8Array(16));
   const payload = `${Math.floor(Date.now()/1000)}.${base64url(nonce)}`;
-  const signature = await crypto.subtle.sign('HMAC', await keyFor(secret), encoder.encode(payload));
+  const signature = await crypto.subtle.sign('HMAC', await keyFor(secret), encoder.encode(`${payload}.${version}`));
   return `${payload}.${base64url(new Uint8Array(signature))}`;
 }
 async function authenticated(request, env) {
@@ -61,8 +62,38 @@ async function authenticated(request, env) {
   if (parts.length !== 3 || !/^\d{10,}$/.test(parts[0]) || !/^[A-Za-z0-9_-]{22}$/.test(parts[1]) || !/^[A-Za-z0-9_-]{43}$/.test(parts[2])) return false;
   const issued = Number(parts[0]), now = Math.floor(Date.now()/1000);
   if (!Number.isSafeInteger(issued) || issued > now + 30 || now - issued >= SESSION_SECONDS) return false;
-  try { return await crypto.subtle.verify('HMAC', await keyFor(env.SESSION_SECRET), unbase64url(parts[2]), encoder.encode(`${parts[0]}.${parts[1]}`)); }
+  const record = await getAuthRecord(env);
+  try { return await crypto.subtle.verify('HMAC', await keyFor(env.SESSION_SECRET), unbase64url(parts[2]), encoder.encode(`${parts[0]}.${parts[1]}.${record?.version || 'bootstrap'}`)); }
   catch { return false; }
+}
+// D1 without the Sessions API executes every query against the primary. Avoid KV for auth state:
+// session revocation and password changes must not be subject to edge cache propagation.
+async function getAuthRecord(env) {
+  return env.AUTH_DB.prepare('SELECT salt, hash, version FROM admin_auth WHERE id = 1').first();
+}
+async function derivePasswordHash(password, salt, pepper) {
+  const pepperKey = await crypto.subtle.importKey('raw', encoder.encode(pepper), {name:'HMAC',hash:'SHA-256'}, false, ['sign']);
+  const peppered = await crypto.subtle.sign('HMAC', pepperKey, encoder.encode(`hyprint-admin-password\0${password}`));
+  const base = await crypto.subtle.importKey('raw', peppered, 'PBKDF2', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'}, base, 256));
+}
+async function checkPassword(candidate, env, record) {
+  if(typeof candidate !== 'string' || candidate.length > 256) return false;
+  if(!record) return passwordMatches(candidate,env.ADMIN_PASSWORD);
+  if(!/^[A-Za-z0-9_-]{22}$/.test(record.salt) || !/^[A-Za-z0-9_-]{43}$/.test(record.hash) || !/^[A-Za-z0-9_-]{22}$/.test(record.version)) throw new Error('invalid auth record');
+  const actual=await derivePasswordHash(candidate,unbase64url(record.salt),env.PASSWORD_PEPPER);
+  const expected=unbase64url(record.hash);let difference=0;
+  for(let i=0;i<actual.length;i++) difference|=actual[i]^expected[i];
+  return difference===0;
+}
+async function updatePassword(env, currentRecord, password) {
+  const salt=crypto.getRandomValues(new Uint8Array(16)), version=base64url(crypto.getRandomValues(new Uint8Array(16)));
+  const hash=await derivePasswordHash(password,salt,env.PASSWORD_PEPPER);
+  const statement=currentRecord
+    ? env.AUTH_DB.prepare('UPDATE admin_auth SET salt = ?, hash = ?, version = ? WHERE id = 1 AND version = ?').bind(base64url(salt),base64url(hash),version,currentRecord.version)
+    : env.AUTH_DB.prepare('INSERT INTO admin_auth (id, salt, hash, version) SELECT 1, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM admin_auth WHERE id = 1)').bind(base64url(salt),base64url(hash),version);
+  const result=await statement.run();
+  return result.meta.changes===1;
 }
 function sessionCookie(token, maxAge = SESSION_SECONDS) {
   return `${COOKIE}=${token}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Strict`;
@@ -89,8 +120,21 @@ export default {
         const {success} = await env.LOGIN_LIMITER.limit({key:`admin-login:${ip}`});
         if (!success) return json(429,{error:'Terlalu banyak percobaan. Coba lagi nanti.'},{'Retry-After':'60'});
         const body = await parseJson(request);
-        if (!body || !await passwordMatches(body.password, env.ADMIN_PASSWORD)) return json(401,{error:'Kata sandi salah.'});
-        return json(200,{ok:true},{'Set-Cookie':sessionCookie(await issueToken(env.SESSION_SECRET))});
+        const record=await getAuthRecord(env);
+        if (!body || !await checkPassword(body.password, env, record)) return json(401,{error:'Kata sandi salah.'});
+        return json(200,{ok:true},{'Set-Cookie':sessionCookie(await issueToken(env.SESSION_SECRET, record?.version || 'bootstrap'))});
+      }
+      if (path === '/api/admin/password' && request.method === 'POST') {
+        if (!configured(env) || !env.LOGIN_LIMITER) return json(503,{error:'Admin belum dikonfigurasi.'});
+        if (!await authenticated(request,env)) return json(401,{error:'Sesi tidak aktif. Masuk kembali.'});
+        const ip=request.headers.get('CF-Connecting-IP') || 'unknown';
+        if (!(await env.LOGIN_LIMITER.limit({key:`admin-password:${ip}`})).success) return json(429,{error:'Terlalu banyak percobaan. Coba lagi nanti.'},{'Retry-After':'60'});
+        const body=await parseJson(request);
+        if (!body || typeof body.newPassword !== 'string' || body.newPassword.length < 12 || body.newPassword.length > 256 || body.newPassword === body.currentPassword) return json(400,{error:'Kata sandi baru harus 12–256 karakter dan berbeda dari sebelumnya.'});
+        const record=await getAuthRecord(env);
+        if (!await checkPassword(body.currentPassword,env,record)) return json(403,{error:'Kata sandi lama salah.'});
+        if (!await updatePassword(env,record,body.newPassword)) return json(409,{error:'Kata sandi telah berubah. Masuk kembali.'});
+        return json(200,{ok:true},{'Set-Cookie':sessionCookie('',0)});
       }
       if (path === '/api/admin/logout' && request.method === 'POST') return json(200,{ok:true},{'Set-Cookie':sessionCookie('',0)});
       if (path === '/api/admin/session' && request.method === 'GET') return await authenticated(request,env) ? json(200,{authenticated:true}) : json(401,{authenticated:false});

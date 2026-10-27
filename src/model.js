@@ -12,13 +12,37 @@ export function colorCoverage(rgba) {
   }
   return rgba.length ? colored/(rgba.length/4) : 0;
 }
+// Only purely white pixels count as blank. Preserve even very faint marks.
+export function isBlankPage(rgba) {
+  if (!rgba.length || rgba.length % 4 !== 0) return false;
+  for (let i=0; i<rgba.length; i+=4) {
+    if (rgba[i] !== 255 || rgba[i+1] !== 255 || rgba[i+2] !== 255) return false;
+  }
+  return true;
+}
 export function calculate(pages, bwPrice, colorPrice) {
   let bw=0,color=0;
   for(const p of pages) if(p.selected) { if(p.color) color+=p.copies; else bw+=p.copies; }
   return {bw,color,total:bw*bwPrice+color*colorPrice};
 }
-export function printPlan(pages) {
-  return pages.flatMap(p=>p.selected ? Array.from({length:p.copies},()=>({number:p.number,color:p.color})) : []);
+export function printPlan(pages, reverse = false) {
+  const ordered = reverse ? [...pages].reverse() : pages;
+  return ordered.flatMap(p=>p.selected ? Array.from({length:p.copies},()=>({number:p.number,color:p.color})) : []);
+}
+// A reversing driver cancels an already reversed document; compensate once.
+export function reverseForDriver(desiredReverse, driverReverses) {
+  return Boolean(desiredReverse) !== Boolean(driverReverses);
+}
+export function printPreferences(storage) {
+  const defaults={reverse:true,driverReverse:true,skipBlank:false};
+  try {
+    const saved=JSON.parse(storage.getItem('hyprint.printPreferences') || 'null');
+    if (saved && ['reverse','driverReverse','skipBlank'].every(key=>typeof saved[key]==='boolean')) return saved;
+  } catch {}
+  return defaults;
+}
+export function storePrintPreferences(storage, preferences) {
+  try {storage.setItem('hyprint.printPreferences',JSON.stringify(preferences));} catch {}
 }
 export function documentKind(name) {
   const suffix = name.toLowerCase().split('.').pop();
@@ -27,8 +51,9 @@ export function documentKind(name) {
 export function pageOverflow(renderedHeight, pageHeight) {
   return Number.isFinite(pageHeight) && pageHeight > 0 && renderedHeight > pageHeight + 3;
 }
-export function filterPages(pages, mode = 'all', selectedOnly = false) {
-  if (!['all', 'color', 'bw'].includes(mode)) throw new RangeError('Invalid page filter');
-  return pages.filter(page => (!selectedOnly || page.selected) && (mode === 'all' || page.color === (mode === 'color')));
+export function filterPages(pages, mode = 'all', selectedOnly = false, skipBlank = false) {
+  if (!['all', 'color', 'bw', 'blank'].includes(mode)) throw new RangeError('Invalid page filter');
+  return pages.filter(page => (!selectedOnly || page.selected) && (!skipBlank || !page.blank)
+    && (mode === 'all' || (mode === 'blank' ? page.blank : page.color === (mode === 'color'))));
 }
 
