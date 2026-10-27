@@ -9,7 +9,7 @@ OutFile "..\dist\installer\HY-Print-Setup-${AppVersion}.exe"
 InstallDir "$LOCALAPPDATA\Programs\HY Print"
 InstallDirRegKey HKCU "Software\HY Print" "InstallDir"
 RequestExecutionLevel user
-SetCompressor /SOLID lzma
+SetCompressor /SOLID zlib
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "..\LICENSE"
