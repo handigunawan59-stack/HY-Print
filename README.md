@@ -2,6 +2,8 @@
 
 HY Print adalah aplikasi browser untuk menyiapkan cetakan dari komputer Windows. Dokumen diproses di perangkat pengguna; situs tidak mengunggahnya untuk pemeriksaan. Desain antarmuka dibuat di FigCraft dengan gaya yang terinspirasi iOS.
 
+Buka situs: https://hy-print.handigunawan59-aa6.workers.dev
+
 ## Kemampuan
 
 - Memeriksa PDF dan mengubah dokumen Word `.docx` menjadi PDF di browser. Konversi Word bersifat perkiraan: font, tata letak, gambar, dan pemisahan halaman dapat berbeda dari Microsoft Word. Untuk hasil yang membutuhkan kesetiaan tinggi, simpan sebagai PDF melalui Word lalu buka PDF tersebut.
@@ -31,3 +33,4 @@ Build statis tersedia di `dist/`. Lihat [CLOUDFLARE.md](CLOUDFLARE.md) untuk men
 ## Lisensi
 
 Proyek ini dirilis dengan GNU AGPL-3.0-or-later, lihat [LICENSE](LICENSE). Dependensi memiliki lisensinya masing-masing. Rilis desktop v0.1.0 merupakan versi lama dan tidak digunakan oleh situs ini.
+
