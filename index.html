@@ -14,15 +14,24 @@
     <div class="top-actions"><span class="privacy"><span aria-hidden="true">●</span> Dokumen tetap di perangkat Anda</span><button id="admin-open" class="button button-light" type="button">⚙ &nbsp;Admin</button></div>
   </header>
   <main class="main">
-    <div class="page-heading"><div><h1>Siapkan cetakan</h1><p>Pilih dokumen. Halaman kosong tidak akan dicetak.</p></div><span class="device-label">Untuk browser Windows</span></div>
+    <div class="page-heading"><div><h1>Siapkan cetakan</h1><p>Tambahkan dokumen dan pilih halaman untuk satu pesanan.</p></div><span class="device-label">Untuk browser Windows</span></div>
     <div class="workspace">
       <section class="document-card card" aria-labelledby="doc-heading">
-        <div class="section-top"><div><h2 id="doc-heading">Dokumen</h2><p>Dokumen tetap berada di perangkat Anda.</p></div><span class="file-count" id="page-count">Belum ada dokumen</span></div>
-        <label class="drop-zone" for="file"><span class="upload-icon" aria-hidden="true">＋</span><span><strong>Pilih dokumen PDF atau Word</strong><small>Klik di sini atau seret dokumen ke kotak ini</small></span><span class="file-pill">PDF / DOCX</span></label>
-        <input id="file" type="file" accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="visually-hidden" />
+        <div class="section-top"><div><h2 id="doc-heading">Dokumen</h2><p>Tambahkan satu atau beberapa dokumen. Semua diproses di perangkat Anda.</p></div><span class="file-count" id="page-count">Belum ada dokumen</span></div>
+        <label class="drop-zone" for="file"><span class="upload-icon" aria-hidden="true">＋</span><span><strong>Pilih dokumen PDF atau Word</strong><small>Klik atau seret beberapa dokumen ke sini</small></span><span class="file-pill">PDF / DOCX</span></label>
+        <input id="file" type="file" accept="application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" class="visually-hidden" multiple />
         <p class="word-hint">File Word .docx diubah menjadi PDF. Periksa hasilnya karena tata letaknya bisa berbeda. Untuk file .doc, simpan dulu sebagai .docx atau PDF.</p>
         <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+        <div class="document-list-heading"><h3>Dokumen dalam pesanan</h3><button id="add-file" class="text-button" type="button">＋ Tambah dokumen</button></div>
+        <div id="documents" class="documents" aria-label="Daftar dokumen dalam pesanan"><p class="documents-empty">Belum ada dokumen. Pilih file untuk memulai.</p></div>
         <div id="file-info" class="file-info" hidden><span class="pdf-icon">FILE</span><div class="filename"><strong id="filename"></strong><small id="file-detail"></small></div><button class="text-button" id="change-file" type="button">Ganti dokumen</button></div>
+        <div class="selection-panel" aria-labelledby="selection-heading">
+          <div class="selection-heading"><div><h3 id="selection-heading">Pilih halaman</h3><p id="active-document-label">Pilih dokumen untuk mengatur halamannya.</p></div></div>
+          <label class="control-label" for="page-range">Nomor halaman pada dokumen ini</label>
+          <div class="range-controls"><input id="page-range" type="text" placeholder="Contoh: 1-5, 8, 10-12" autocomplete="off" aria-describedby="range-message" disabled /><button id="apply-range" class="button button-light" type="button" disabled>Pilih halaman</button></div>
+          <p id="range-message" class="range-message" role="status" aria-live="polite">Gunakan koma untuk memisahkan nomor dan tanda - untuk rentang.</p>
+          <div class="bulk-controls"><label for="bulk-mode">Warna cetak<select id="bulk-mode" disabled><option value="">Tidak diubah</option><option value="bw">Hitam putih</option><option value="color">Warna</option></select></label><label for="bulk-copies">Salinan<input id="bulk-copies" type="number" min="1" max="99" step="1" placeholder="Tetap" disabled /></label><button id="apply-bulk" class="button button-light" type="button" disabled>Terapkan ke halaman terpilih</button></div>
+        </div>
         <div class="preview-toolbar"><div><h3>Pratinjau halaman</h3><p>Halaman kosong dilewati otomatis. Klik halaman untuk memeriksa.</p></div><div class="segments" role="group" aria-label="Tampilkan halaman"><button type="button" class="active" data-preview-filter="all" aria-pressed="true">Semua</button><button type="button" data-preview-filter="color" aria-pressed="false">Warna</button><button type="button" data-preview-filter="bw" aria-pressed="false">Hitam putih</button><button type="button" data-preview-filter="blank" aria-pressed="false">Kosong</button></div></div>
         <div class="page-actions"><span id="preview-label">Belum ada halaman</span><div><button class="text-button" id="select-all" type="button" disabled>Pilih semua</button><button class="text-button" id="select-none" type="button" disabled>Batal pilih semua</button></div></div>
         <div id="pages" class="page-grid"><p class="empty">Pilih dokumen untuk melihat halamannya di sini.</p></div>
@@ -47,7 +56,7 @@
         <button id="settings-retry" class="text-button" type="button" hidden>Coba muat lagi</button>
         <div class="estimate"><span>Perkiraan biaya</span><strong id="total">Rp 0</strong><p id="summary">Belum ada halaman untuk dicetak</p></div>
         <button id="print" class="primary" type="button" disabled><span aria-hidden="true">▣</span> Lanjut ke cetak</button>
-        <p class="print-note">Di jendela cetak, pilih printer dan kertas. Pilih <b>semua halaman</b> dan <b>1 salinan</b> karena jumlah salinan sudah diatur di sini.</p>
+        <p class="print-note">Di jendela cetak, pilih printer, <b>semua halaman</b>, dan <b>1 salinan</b>. Jika ukuran atau posisi dokumen berbeda, semua akan memakai pengaturan kertas yang sama. Periksa hasilnya sebelum mencetak.</p>
       </aside>
     </div>
     <footer><span>HY Print</span><span>Dokumen tidak dikirim ke server · Cetak melalui browser</span></footer>
